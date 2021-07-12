@@ -302,7 +302,7 @@ def cell_stats_parallel(func, geom_df, params, cores):
     return ret_list
 
 
-
+@timer
 def create_cell_stats_df(params, cpus, results_path):
     '''Create cell stats. Global coverage or extnet coverage'''
     stats = []
@@ -310,13 +310,16 @@ def create_cell_stats_df(params, cpus, results_path):
 
     chunksize = 2000
     npartitions = cpus * 2
+
     if len(params) == 4:
         gdf = create_cells(params[0], params[1], params[3])
         rows = len(gdf.index)
         da = None
         if rows / npartitions < chunksize:
+            print(f"starting create_cell_stats_df {npartitions} npartitions")
             da = ddf.from_pandas(gdf, npartitions=npartitions)
         else:
+            print(f"starting create_cell_stats_df {chunksize} chunksize")
             da = ddf.from_pandas(gdf, chunksize=chunksize)
 
         # gdf = get_cells_area(gdf, params[2])
@@ -352,12 +355,12 @@ def create_cell_stats_df(params, cpus, results_path):
         name = d_name[0]
         if len(d_name) > 1:
             name = '_'.join(d_name)
-        
+
         name = f"{name}_{res}_{p_name}"
         parquet_file_name = os.path.join(results_path, f"{name}.parquet")
 
         da6_fin = da6.compute()
-        da6_fin.drop(columns="geometry").to_parquet(parquet_file_name, compress='gzip', index=False)
+        da6_fin.drop(columns="geometry").to_parquet(parquet_file_name, compression='gzip', index=False)
 
         area_mean = da6_fin['area'].mean()
         da6_fin['std_area'] = da6_fin['area'] / area_mean
