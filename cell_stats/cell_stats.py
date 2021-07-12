@@ -45,6 +45,11 @@ except ImportError as ex:
     print("OpenEaggr modules not found")
     print(ex)
 
+try:
+    from dggrid4py import DGGRIDv7, Dggs, dgselect, dggs_types
+except ImportError as ex:
+    print("dggrid4py modules not found")
+    print(ex)
 
 import numpy as np
 import functools
