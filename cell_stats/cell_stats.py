@@ -1,5 +1,13 @@
 import sys
 import os
+
+# python env conda daskgeo2020a
+
+# OpenEAGGR via Python wheel egg
+
+# Google S2 via sys.path.append('/usr/local/lib/python3/dist-packages')
+sys.path.append('/usr/local/lib/python3.7/site-packages')
+
 import geopandas as gpd
 from shapely.geometry import Polygon, shape
 from shapely.ops import transform
@@ -66,7 +74,7 @@ def check_crossing(lon1: float, lon2: float, validate: bool = True):
     checks if the 180th meridian (antimeridian) is crossed.
     """
     if validate and any(abs(x) > 180.0 for x in [lon1, lon2]):
-        raise ValueError("longitudes must be in degrees [-180.0, 180.0]")   
+        raise ValueError("longitudes must be in degrees [-180.0, 180.0]")
     return abs(lon2 - lon1) > 180.0
 
 def check_for_geom(geom):
@@ -80,12 +88,12 @@ def check_for_geom(geom):
         if check_crossing(p_init[0], px[0]):
             crossed = True
         p_init = px
-    
+
     return crossed
 
 @timer
 def get_cells_area_stats(df, res):
-    
+
     # Filter out invalid geometry
     try:
         df['crossed'] = df['geometry'].apply(check_for_geom)
@@ -93,7 +101,7 @@ def get_cells_area_stats(df, res):
         df = df[~df['crossed']]
         other_geom_anomalies = len(df[(df['area']<df['area'].quantile(0.005))&(df['area']>df['area'].quantile(0.995))])
         df = df[(df['area']>df['area'].quantile(0.005))&(df['area']<df['area'].quantile(0.995))]
-        df['std_area'] = df['area']/df['area'].mean() 
+        df['std_area'] = df['area']/df['area'].mean()
         df['zsc'] = df.apply(zsc_calculation,axis=1)
         area_min = df['area'].min()
         area_max = df['area'].max()
@@ -104,14 +112,14 @@ def get_cells_area_stats(df, res):
         zsc_std = df['zsc'].std()
         zsc_std_range = df['zsc'].max() - df['zsc'].min()
         num_cells = len(df)
-        
+
         stats_pd = pd.DataFrame({'resolution':[res],'min_area':[area_min],'max_area':[area_max],\
                                 'std':[area_std],'mean':[area_mean],'num_cells':[num_cells], 'std_area_std':[std_area_std],\
                                 'std_area_range':[std_area_range], 'zsc_std':[zsc_std], 'zsc_std_range':[zsc_std_range],\
                                 'date_line_cross_error_cells':[date_line_cross_error_cells],'other_geom_anomalies':other_geom_anomalies})
-    
+
         return stats_pd
-    except: 
+    except:
         print(len(df))
         return None
 
@@ -130,7 +138,7 @@ def get_lambert_area(geom):
 
 
 def convert_wgs_to_utm(lon, lat):
-    '''Get UTM zone from lat lon''' 
+    '''Get UTM zone from lat lon'''
 
     utm_band = str((math.floor((lon + 180) / 6 ) % 60) + 1)
     if len(utm_band) == 1:
@@ -145,7 +153,7 @@ def convert_wgs_to_utm(lon, lat):
 def get_utm_area(geom):
     '''Area from cell's UTM zone'''
     if (-180 <= geom.centroid.x <= 180) and (-90 <= geom.centroid.y <= 90):
-        utm_epsg = convert_wgs_to_utm(geom.centroid.x, geom.centroid.y) 
+        utm_epsg = convert_wgs_to_utm(geom.centroid.x, geom.centroid.y)
         project = pyproj.Transformer.from_crs('EPSG:4236', f'EPSG:{utm_epsg}', always_xy=True).transform
         area = transform(project, geom).area
     else:
@@ -163,7 +171,7 @@ def get_cells_area(gdf,crs):
 
     elif crs =='LAEA':
         gdf['area'],gdf['perimeter'] = zip(*gdf['geometry'].apply(get_area_perimeter_from_lambert))
-        
+
     else:
         gdf = gdf.to_crs(crs)
         gdf['area'] = gdf['geometry'].area
@@ -178,7 +186,7 @@ def create_cells(dggs, resolution, dggrid, extent=None):
             df = get_h3_cells(resolution,extent['geometry'])
         else:
             df = get_h3_cells(resolution,extent)
-        
+
         gdf = create_h3_geometry(df)
 
     elif dggs[0] == 's2':
@@ -186,7 +194,7 @@ def create_cells(dggs, resolution, dggrid, extent=None):
             df = get_s2_cells(resolution,extent['bbox'])
         else:
             df = get_s2_cells(resolution,extent)
-      
+
         gdf = create_s2_geometry(df)
 
     elif dggs[0] == 'DGGRID':
@@ -196,13 +204,13 @@ def create_cells(dggs, resolution, dggrid, extent=None):
             gdf.crs = 'EPSG:4326'
         else:
             gdf = dggrid.grid_cell_polygons_for_extent(dggs[1], resolution)
-    
+
     elif dggs[0] == 'rhpix':
         if extent:
             df = get_rhpix_cells(resolution,extent['bbox'])
         else:
             df = get_rhpix_cells(resolution,extent)
-      
+
         gdf = create_rhpix_geometry(df)
 
     return gdf
@@ -221,7 +229,7 @@ def cell_stats_parallel(func, geom_df, params, cores):
         ret_list = p.map(func, par_params)
 
     ret_list = pd.concat(ret_list)
-    
+
     ret_list = ret_list.groupby('resolution').agg(resolution=('resolution','first'), min_area=('min_area','min'),std_area_std=('std_area_std','mean'), max_area=('max_area','max'),
                                                   std=('std','mean'),mean = ('mean','mean'),num_cells=('num_cells','sum'),std_area_range=('std_area_range','mean'),
                                                   zsc_std=('zsc_std','mean'),zsc_std_range = ('zsc_std_range','mean'),date_line_cross_error_cells=('date_line_cross_error_cells','sum'),
@@ -239,7 +247,7 @@ def create_cell_stats_df(params):
         gdf = create_cells(params[0], params[1], params[3])
         gdf = get_cells_area(gdf, params[2])
         stats.append(get_cells_area_stats(gdf,params[1]))
-    
+
     else:
         for extent in params[4]:
             gdf = create_cells(params[0], params[1], params[3], extent)
@@ -317,18 +325,18 @@ def main():
         for res in dggs['sample_res']:
             print(f"Start processing local resolution {res}")
             stats_df_sample.append(cell_stats_parallel(create_cell_stats_df, sample_polygons,[dggs['name'], res, dggs['proj'], dggrid_instance], cpus))
-        
+
         if len(stats_df_sample) > 0:
             final_stats = pd.concat([pd.concat(stats_df_global),pd.concat(stats_df_sample)])
         else:
             final_stats = pd.concat([pd.concat(stats_df_global)])
 
-        
+
         if len(dggs['name'])>1:
             final_stats['dggs'] = dggs['name'][1]
         else:
             final_stats['dggs'] = dggs['name'][0]
-            
+
         final_stats['proj'] = dggs['proj']
         if not os.path.exists(results_path):
             os.makedirs(results_path)
