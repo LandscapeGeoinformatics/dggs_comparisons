@@ -1,13 +1,6 @@
 import sys
 import os
 
-# python env conda daskgeo2020a
-
-# OpenEAGGR via Python wheel egg
-
-# Google S2 via sys.path.append('/usr/local/lib/python3/dist-packages')
-sys.path.append('/usr/local/lib/python3.7/site-packages')
-
 import geopandas as gpd
 from shapely.geometry import Polygon, shape
 from shapely.ops import transform
@@ -18,14 +11,49 @@ import pandas as pd
 import json
 import math
 from multiprocessing import Pool
+
+# python env conda daskgeo2020a
+
+# OpenEAGGR via Python wheel egg
+
+# Google S2 via sys.path.append('/usr/local/lib/python3/dist-packages')
+sys.path.append('/usr/local/lib/python3.7/site-packages')
+
 sys.path.append('..')
-from h3_helper import *
-from s2_helper import *
-from rhealpix_helper import *
+
+try:
+    from h3_helper import *
+except ImportError as ex:
+    print("H3 modules not found")
+    print(ex)
+
+try:
+    from s2_helper import *
+except ImportError as ex:
+    print("S2 modules not found")
+    print(ex)
+
+try:
+    from rhealpix_helper import *
+except ImportError as ex:
+    print("rhealpix dggs modules not found")
+    print(ex)
+
+try:
+    from eaggr_helper import *
+except ImportError as ex:
+    print("OpenEaggr modules not found")
+    print(ex)
+
+
 import numpy as np
 import functools
-from dggrid4py import DGGRIDv7, Dggs, dgselect, dggs_types
 
+import dask
+import dask.dataframe as ddf
+
+from dask.distributed import Client, LocalCluster
+# from sklearn.metrics import max_error, mean_absolute_error
 
 def timer(func):
 
@@ -56,17 +84,47 @@ def get_area_perimeter_from_lambert(geom):
             area = transform(project, geom).area
         else:
             print(f'invalid centroid {geom.centroid}')
-            perimeter = None
-            area = None
+            perimeter = np.nan
+            area = np.nan
     except:
         print(f'invalid centroid None')
-        perimeter = None
-        area = None
-    return area, perimeter
+        perimeter = np.nan
+        area = np.nan
+    # return (area, perimeter)
+    return pd.Series([area, perimeter])
+
 
 def zsc_calculation(df):
     zsc = math.sqrt(4*math.pi*df['area'] - math.pow(df['area'],2)/math.pow(6378137,2))/df['perimeter']
     return zsc
+
+
+def zsc_calculation_np(df, spherical=False):
+    np_area = df['area'].values
+    np_peri = df['perimeter'].values
+
+    if not spherical:
+        top = 4*np.pi*np_area
+        bottom = np.square(np_peri)
+        c_orig = top / bottom
+
+        return c_orig
+    else:
+        t1 = 4*np.pi*np_area
+        t2 = np.square(np_area)
+        t3 = np.square(6378137.0)
+        top = np.sqrt( t1 - t2/t3 )
+        bottom = np_peri
+        zsc_np = top / bottom
+
+        # zsc_orig = df.apply(lambda row: math.sqrt(  4*math.pi*row['area'] - math.pow(row['area'],2) / math.pow(6378137,2)  )  /   row['perimeter'], axis=1).values
+        # diffs = np.sum(zsc_np - zsc_orig)
+        # ma = max_error(zsc_orig, zsc_np)
+        # mae = mean_absolute_error(zsc_orig, zsc_np)
+        # print(f"ma={ma} mae={mae} diffs={diffs}")
+
+        return zsc_np
+
 
 def check_crossing(lon1: float, lon2: float, validate: bool = True):
     """
@@ -76,6 +134,7 @@ def check_crossing(lon1: float, lon2: float, validate: bool = True):
     if validate and any(abs(x) > 180.0 for x in [lon1, lon2]):
         raise ValueError("longitudes must be in degrees [-180.0, 180.0]")
     return abs(lon2 - lon1) > 180.0
+
 
 def check_for_geom(geom):
     crossed = False
@@ -91,8 +150,9 @@ def check_for_geom(geom):
 
     return crossed
 
+
 @timer
-def get_cells_area_stats(df, res):
+def get_cells_area_stats(df, res, npartitions=32):
 
     # Filter out invalid geometry
     try:
@@ -102,7 +162,9 @@ def get_cells_area_stats(df, res):
         other_geom_anomalies = len(df[(df['area']<df['area'].quantile(0.005))&(df['area']>df['area'].quantile(0.995))])
         df = df[(df['area']>df['area'].quantile(0.005))&(df['area']<df['area'].quantile(0.995))]
         df['std_area'] = df['area']/df['area'].mean()
+
         df['zsc'] = df.apply(zsc_calculation,axis=1)
+
         area_min = df['area'].min()
         area_max = df['area'].max()
         area_std = df['area'].std()
@@ -170,7 +232,8 @@ def get_cells_area(gdf,crs):
         gdf['area'] = gdf['geometry'].apply(get_utm_area)
 
     elif crs =='LAEA':
-        gdf['area'],gdf['perimeter'] = zip(*gdf['geometry'].apply(get_area_perimeter_from_lambert))
+        # gdf['area'],gdf['perimeter'] = zip(*gdf['geometry'].apply(get_area_perimeter_from_lambert))
+        gdf[['area','perimeter']] = gdf['geometry'].apply(get_area_perimeter_from_lambert)
 
     else:
         gdf = gdf.to_crs(crs)
@@ -240,22 +303,91 @@ def cell_stats_parallel(func, geom_df, params, cores):
 
 
 
-def create_cell_stats_df(params):
+def create_cell_stats_df(params, cpus, results_path):
     '''Create cell stats. Global coverage or extnet coverage'''
     stats = []
+    d_name, res, p_name = params[0], params[1], params[2]
+    chunksize = 2000
+    npartitions = cpus * 2
     if len(params) == 4:
         gdf = create_cells(params[0], params[1], params[3])
-        gdf = get_cells_area(gdf, params[2])
-        stats.append(get_cells_area_stats(gdf,params[1]))
+        rows = len(gdf.index)
+        da = None
+        if rows / npartitions < chunksize:
+            da = ddf.from_pandas(gdf, npartitions=npartitions)
+        else:
+            da = ddf.from_pandas(gdf, chunksize=chunksize)
+
+        # gdf = get_cells_area(gdf, params[2])
+        da2 = da.map_partitions(lambda x: get_cells_area(x, params[2]), meta=pd.DataFrame({'cell_id':['str'], 'geometry': ['str'], 'area': [1.0],'perimeter': [0.1]}))
+
+        # area_stats = get_cells_area_stats(gdf,params[1])
+        da2['crossed'] = da2['geometry'].map_partitions( lambda x: x.apply(check_for_geom), meta=pd.Series([True]) )
+
+        da3 = da2.persist()
+
+        date_line_cross_error_cells = len(da3[da3['crossed']].compute().index)
+
+        da3 = da3[~da3['crossed']]
+
+        da4 = da3.persist()
+
+        area_q_low = da4['area'].quantile(0.005).compute()
+        area_q_high = da4['area'].quantile(0.995).compute()
+
+        other_geom_anomalies = len( da4[(da4['area'] < area_q_low) & (da4['area'] > area_q_high)] )
+
+        da4 = da4[(da4['area'] > area_q_low) & (da4['area'] < area_q_high)]
+
+        da5 = da4.persist()
+
+        da5['c_orig'] = da5.map_partitions(lambda x: zsc_calculation_np(x, False),meta=pd.Series({'c_orig': [0.1]}))
+        da5['zsc'] = da5.map_partitions(lambda x: zsc_calculation_np(x, True), meta=pd.Series({'c_orig': [0.1]}))
+
+        da6 = da5.persist()
+
+        # conclude
+        # d_name, res, p_name
+        name = d_name.replace(' ', '_')
+        name = f"{name}_{res}_{p_name}"
+        parquet_file_name = os.path.join(results_path, f"{name}.parquet")
+
+        da6_fin = da6.compute()
+        da6_fin.drop(columns="geometry").to_parquet(parquet_file_name, compress='gzip', index=False)
+
+        area_mean = da6_fin['area'].mean()
+        da6_fin['std_area'] = da6_fin['area'] / area_mean
+
+        area_min = da6_fin['area'].min()
+        area_max = da6_fin['area'].max()
+        area_std = da6_fin['area'].std()
+        area_mean = da6_fin['area'].mean()
+        std_area_std = da6_fin['std_area'].std()
+        std_area_range = da6_fin['std_area'].max() - da6_fin['std_area'].min()
+        zsc_std = da6_fin['zsc'].std()
+        zsc_std_range = da6_fin['zsc'].max() - da6_fin['zsc'].min()
+
+        c_orig_std = da6_fin['c_orig'].std()
+        c_orig_std_range = da6_fin['c_orig'].max() - da6_fin['c_orig'].min()
+
+        num_cells = len(da6_fin)
+
+        area_stats = pd.DataFrame({'resolution':[res],'min_area':[area_min],'max_area':[area_max],
+                                'std':[area_std],'mean':[area_mean],'num_cells':[num_cells], 'std_area_std':[std_area_std],
+                                'std_area_range':[std_area_range], 'zsc_std':[zsc_std], 'zsc_std_range':[zsc_std_range],
+                                'c_orig_std':[c_orig_std], 'c_orig_std_range':[c_orig_std_range],
+                                'date_line_cross_error_cells':[date_line_cross_error_cells],'other_geom_anomalies':[other_geom_anomalies]})
+        stats.append(area_stats)
 
     else:
         for extent in params[4]:
             gdf = create_cells(params[0], params[1], params[3], extent)
             gdf = get_cells_area(gdf, params[2])
-            stats.append(get_cells_area_stats(gdf,params[1]))
+
+            area_stats = get_cells_area_stats(gdf,params[1])
+            stats.append(area_stats)
 
     return pd.concat(stats)
-
 
 
 def main():
@@ -310,6 +442,36 @@ def main():
     if not os.path.exists(dggrid_work_dir):
         os.makedirs(dggrid_work_dir)
 
+    if not os.path.exists(results_path):
+        os.makedirs(results_path)
+
+    if dggrid_exec == 'julia':
+        try:
+            from julia.api import Julia
+
+            jl = Julia(compiled_modules=False)
+            jl.eval("using DGGRID7_jll")
+            dirs = jl.eval("DGGRID7_jll.LIBPATH_list")
+
+            # for Windows path separator is ";" and the variable is PATH
+            # for linux the path separator is ":" and the variable is LD_LIBRARY_PATH
+            if sys.platform.startswith('win'):
+
+                path_update = ";".join(dirs)
+                os.environ["PATH"] = os.environ["PATH"] + ";" + path_update
+
+            else:
+                path_update = ":".join(dirs)
+                os.environ["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"] + ":" + path_update
+
+            dggrid_exec = jl.eval("DGGRID7_jll.get_dggrid_path()")
+        except Exception as err:
+            print(err)
+
+    # create the dask client
+    cluster = LocalCluster(processes=True, n_workers=cpus)
+    dclient = Client(cluster)
+
     for dggs in config['dggss']:
         print(f"Start processing {dggs['name']}")
         if dggs['name'][0] == 'DGGRID':
@@ -319,7 +481,9 @@ def main():
         stats_df_global = []
         for res in dggs['global_res']:
             print(f"Start processing global resolution {res}")
-            stats_df_global.append(create_cell_stats_df([dggs['name'], res, dggs['proj'], dggrid_instance]))
+
+            out_df = create_cell_stats_df([dggs['name'], res, dggs['proj'], dggrid_instance], cpus, results_path)
+            stats_df_global.append(out_df)
 
         stats_df_sample = []
         for res in dggs['sample_res']:
@@ -338,8 +502,8 @@ def main():
             final_stats['dggs'] = dggs['name'][0]
 
         final_stats['proj'] = dggs['proj']
-        if not os.path.exists(results_path):
-            os.makedirs(results_path)
+
+
         if len(dggs['name']) == 1:
             name = dggs['name'][0]
         else:
@@ -348,6 +512,7 @@ def main():
         res_file_name = os.path.join(results_path, default_name + f"_{name}.csv")
 
         final_stats.to_csv(res_file_name, index=False)
+
 
 if __name__ == "__main__":
     main()
