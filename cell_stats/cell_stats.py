@@ -307,6 +307,7 @@ def create_cell_stats_df(params, cpus, results_path):
     '''Create cell stats. Global coverage or extnet coverage'''
     stats = []
     d_name, res, p_name = params[0], params[1], params[2]
+
     chunksize = 2000
     npartitions = cpus * 2
     if len(params) == 4:
@@ -348,7 +349,10 @@ def create_cell_stats_df(params, cpus, results_path):
 
         # conclude
         # d_name, res, p_name
-        name = d_name.replace(' ', '_')
+        name = d_name[0]
+        if len(d_name) > 1:
+            name = '_'.join(d_name)
+        
         name = f"{name}_{res}_{p_name}"
         parquet_file_name = os.path.join(results_path, f"{name}.parquet")
 
