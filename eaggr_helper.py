@@ -69,29 +69,29 @@ def get_eaggr_indexes_at_level(df_level_0, resolution, dggs):
                                     .stack().to_frame('cell').reset_index(1, drop=True).reset_index(drop=True))
         return get_eaggr_indexes_at_level(next_res, resolution - 1, dggs)
 
-def get_eaggr_cells(res, extent=None):
-    
+def get_eaggr_cells(res, extent=None, dggs_type="ISEA4T"):
+
     """Get eaggr cells for given resolution
 
     Parameters:
-    res (int): h3 resolution 
+    res (int): resolution
     extent (list): Extent as array of 2 lon lat pairs to get raster values for
     Returns:
     Pandas dataframe
    """
-    dggs = Eaggr(Model.ISEA4T)
+    dggs = Eaggr(Model.ISEA3H) if dggs_type == "ISEA3H" else Eaggr(Model.ISEA4T)
     cell_ids_0 = list(map(lambda x: '0' + x, list(map(str, [x for x in range(10)]))))
     cell_ids_0.extend(list(map(str, [x for x in range(10, 20, 1)])))
     gdf_level_0 = gpd.GeoDataFrame()
     gdf_level_0['cell'] = pd.Series(list(map(lambda x: DggsCell(x), cell_ids_0)))
-    
+
     df = get_eaggr_indexes_at_level(gdf_level_0, res, dggs).copy()
     df['cell_id'] = df['cell'].apply(lambda x: x.get_cell_id())
-    return df 
+    return df
 
 
-def create_eaggrt_cells_global(resolutions, table):
-    dggs = Eaggr(Model.ISEA4T)
+def create_eaggrt_cells_global(resolutions, table, dggs_type="ISEA4T"):
+    dggs = Eaggr(Model.ISEA3H) if dggs_type == "ISEA3H" else Eaggr(Model.ISEA4T)
     cell_ids_0 = list(map(lambda x: '0' + x, list(map(str, [x for x in range(10)]))))
     cell_ids_0.extend(list(map(str, [x for x in range(10, 20, 1)])))
     gdf_level_0 = gpd.GeoDataFrame()
@@ -117,7 +117,7 @@ def create_eaggrt_cells_global(resolutions, table):
         gdf_level_.to_file("{}{}.geojson".format(table, r), driver='GeoJSON')
 
 
-def raster_to_eaggr_t(raster_path, value_name, sampling_grid_size, grid_point_accuracy, extent=None):
+def raster_to_eaggr_t(raster_path, value_name, sampling_grid_size, grid_point_accuracy, extent=None, dggs_type="ISEA4T"):
     """Load raster values into s2 dggs cells
 
     Parameters:
@@ -131,7 +131,7 @@ def raster_to_eaggr_t(raster_path, value_name, sampling_grid_size, grid_point_ac
     Pandas dataframe
    """
 
-    dggs = Eaggr(Model.ISEA4T)
+    dggs = Eaggr(Model.ISEA3H) if dggs_type == "ISEA3H" else Eaggr(Model.ISEA4T)
     # Open raster
     rs = rasterio.open(raster_path)
 
@@ -175,7 +175,7 @@ def raster_to_eaggr_t(raster_path, value_name, sampling_grid_size, grid_point_ac
     return eaggr_gdf
 
 
-def vector_to_eaggr_t(vector_path, value_name, sampling_grid_size, grid_point_accuracy, extent=None, layer=None):
+def vector_to_eaggr_t(vector_path, value_name, sampling_grid_size, grid_point_accuracy, extent=None, layer=None, dggs_type="ISEA4T"):
     """Load vector values into s2 dggs cells
 
     Parameters:
@@ -187,7 +187,7 @@ def vector_to_eaggr_t(vector_path, value_name, sampling_grid_size, grid_point_ac
     Pandas dataframe
    """
 
-    dggs = Eaggr(Model.ISEA4T)
+    dggs = Eaggr(Model.ISEA3H) if dggs_type == "ISEA3H" else Eaggr(Model.ISEA4T)
 
     # Open vector to geodataframe
     gdf = gpd.read_file(vector_path, layer)
@@ -224,7 +224,7 @@ def vector_to_eaggr_t(vector_path, value_name, sampling_grid_size, grid_point_ac
     return vector_eaggr
 
 
-def cell_eaggr_t_downsampling(df, cell_id_col, metric_col, coarse_resolution, metric_type):
+def cell_eaggr_t_downsampling(df, cell_id_col, metric_col, coarse_resolution, metric_type, dggs_type="ISEA4T"):
     """Aggregates a given attribute in eaggr cell to a given coarser resolution level
 
     Parameters:
@@ -237,7 +237,7 @@ def cell_eaggr_t_downsampling(df, cell_id_col, metric_col, coarse_resolution, me
     Pandas dataframe
    """
 
-    dggs = Eaggr(Model.ISEA4T)
+    dggs = Eaggr(Model.ISEA3H) if dggs_type == "ISEA3H" else Eaggr(Model.ISEA4T)
     df_coarse = df.copy()
     coarse_id_col = 'cell_id_{}'.format(coarse_resolution)
     df_coarse[coarse_id_col] = df_coarse[cell_id_col].apply(
@@ -255,9 +255,9 @@ def cell_eaggr_t_downsampling(df, cell_id_col, metric_col, coarse_resolution, me
     return dfc
 
 
-def create_eaggr_geometry(df):
+def create_eaggr_geometry(df, dggs_type="ISEA4T"):
 
-    dggs = Eaggr(Model.ISEA4T)
+    dggs = Eaggr(Model.ISEA3H) if dggs_type == "ISEA3H" else Eaggr(Model.ISEA4T)
     df['geojson'] = df['cell_id'].apply(lambda x: json.loads
     (dggs.convert_dggs_cell_outline_to_shape_string(DggsCell(x), ShapeStringFormat.GEO_JSON)))
 
