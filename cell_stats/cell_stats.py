@@ -275,6 +275,14 @@ def create_cells(dggs, resolution, dggrid, extent=None):
 
         gdf = gdf.rename(columns={"Name": "cell_id", "name": "cell_id"})
 
+    elif dggs[0] == 'eaggr':
+        if extent:
+            df = get_eaggr_cells(resolution,extent['bbox'], dggs[1])
+        else:
+            df = get_eaggr_cells(resolution,extent, dggs[1])
+
+        gdf = create_eaggr_geometry(df, dggs[1])
+
     elif dggs[0] == 'rhpix':
         if extent:
             df = get_rhpix_cells(resolution,extent['bbox'])
