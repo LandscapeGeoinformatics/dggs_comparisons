@@ -258,13 +258,14 @@ def cell_eaggr_t_downsampling(df, cell_id_col, metric_col, coarse_resolution, me
 def create_eaggr_geometry(df, dggs_type="ISEA4T"):
 
     dggs = Eaggr(Model.ISEA3H) if dggs_type == "ISEA3H" else Eaggr(Model.ISEA4T)
-    df['geojson'] = df['cell_id'].apply(lambda x: json.loads
-    (dggs.convert_dggs_cell_outline_to_shape_string(DggsCell(x), ShapeStringFormat.GEO_JSON)))
-
-    df['geometry'] = df['geojson'].apply(
-        lambda x: Polygon([x['coordinates'][0][0], x['coordinates'][0][1],
-                           x['coordinates'][0][2]]))
-
+    # df['geojson'] = df['cell_id'].apply(lambda x: json.loads
+    # (dggs.convert_dggs_cell_outline_to_shape_string(DggsCell(x), ShapeStringFormat.GEO_JSON)))
+    #
+    # df['geometry'] = df['geojson'].apply(
+    #     lambda x: Polygon([x['coordinates'][0][0], x['coordinates'][0][1],
+    #                        x['coordinates'][0][2]]))
+    df['geometry'] = df['cell'].apply(lambda x: Polygon(
+        json.loads(dggs.convert_dggs_cell_outline_to_shape_string(x, ShapeStringFormat.GEO_JSON))["coordinates"][0] ) )
     df = gpd.GeoDataFrame(df)
     df.crs = "EPSG:4326"
-    return df
+    return df[['cell_id', 'geometry']]
