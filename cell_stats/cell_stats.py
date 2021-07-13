@@ -273,6 +273,8 @@ def create_cells(dggs, resolution, dggrid, extent=None):
         else:
             gdf = dggrid.grid_cell_polygons_for_extent(dggs[1], resolution)
 
+        gdf = gdf.rename(columns={"Name": "cell_id", "name": "cell_id"})
+
     elif dggs[0] == 'rhpix':
         if extent:
             df = get_rhpix_cells(resolution,extent['bbox'])
