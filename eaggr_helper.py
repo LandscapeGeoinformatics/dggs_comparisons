@@ -11,6 +11,7 @@ from eaggr.shapes.dggs_cell import DggsCell
 import eaggr.shapes
 from eaggr.enums.model import Model
 from shapely.geometry import box, Polygon, Point
+from shapely import wkt
 import numpy as np
 import json
 from shapely.ops import transform
@@ -61,13 +62,23 @@ def generate_grid(extent, grid_size):
     return int_grid
 
 
-def get_eaggr_indexes_at_level(df_level_0, resolution, dggs):
+def get_eaggr_indexes_at_level(df_level_0, resolution, dggs, dggs_type="ISEA4T"):
     if resolution == 0:
         return df_level_0
     else:
-        next_res = gpd.GeoDataFrame(df_level_0['cell'].apply(lambda x: pd.Series(dggs.get_dggs_cell_children(x))) \
-                                    .stack().to_frame('cell').reset_index(1, drop=True).reset_index(drop=True))
-        return get_eaggr_indexes_at_level(next_res, resolution - 1, dggs)
+        if dggs_type == "ISEA3H":
+            tx = df_level_0['cell'].apply(lambda x: pd.Series(dggs.get_dggs_cell_children(x))).stack().to_frame('cell').reset_index(1, drop=True).reset_index(drop=True)
+            cell_ids_child = tx['cell'].apply(lambda x: x.get_cell_id()).unique()
+            print(f"get_eaggr_indexes_at_level resolution {resolution} tx {tx.values.shape} cell_ids_child {cell_ids_child.shape}")
+            next_res = gpd.GeoDataFrame()
+            next_res['cell'] = pd.Series(list(map(lambda x: DggsCell(x), cell_ids_child)))
+            print(f"get_eaggr_indexes_at_level next_res {next_res.values.shape}")
+            return get_eaggr_indexes_at_level(next_res, resolution - 1, dggs, dggs_type)
+        else:
+            next_res = gpd.GeoDataFrame(df_level_0['cell'].apply(lambda x: pd.Series(dggs.get_dggs_cell_children(x))) \
+                                        .stack().to_frame('cell').reset_index(1, drop=True).reset_index(drop=True))
+            return get_eaggr_indexes_at_level(next_res, resolution - 1, dggs, dggs_type)
+
 
 def get_eaggr_cells(res, extent=None, dggs_type="ISEA4T"):
 
@@ -80,8 +91,13 @@ def get_eaggr_cells(res, extent=None, dggs_type="ISEA4T"):
     Pandas dataframe
    """
     dggs = Eaggr(Model.ISEA3H) if dggs_type == "ISEA3H" else Eaggr(Model.ISEA4T)
-    cell_ids_0 = list(map(lambda x: '0' + x, list(map(str, [x for x in range(10)]))))
-    cell_ids_0.extend(list(map(str, [x for x in range(10, 20, 1)])))
+
+    cell_ids_0 = []
+    if dggs_type == "ISEA3H":
+        cell_ids_0 = [str(x).zfill(2) + "000,0" for x in range(20)]
+    else:
+        cell_ids_0 = [str(x).zfill(2) for x in range(20)]
+
     gdf_level_0 = gpd.GeoDataFrame()
     gdf_level_0['cell'] = pd.Series(list(map(lambda x: DggsCell(x), cell_ids_0)))
 
@@ -92,8 +108,13 @@ def get_eaggr_cells(res, extent=None, dggs_type="ISEA4T"):
 
 def create_eaggrt_cells_global(resolutions, table, dggs_type="ISEA4T"):
     dggs = Eaggr(Model.ISEA3H) if dggs_type == "ISEA3H" else Eaggr(Model.ISEA4T)
-    cell_ids_0 = list(map(lambda x: '0' + x, list(map(str, [x for x in range(10)]))))
-    cell_ids_0.extend(list(map(str, [x for x in range(10, 20, 1)])))
+
+    cell_ids_0 = []
+    if dggs_type == "ISEA3H":
+        cell_ids_0 = [str(x).zfill(2) + "000,0" for x in range(20)]
+    else:
+        cell_ids_0 = [str(x).zfill(2) for x in range(20)]
+
     gdf_level_0 = gpd.GeoDataFrame()
     gdf_level_0['cell'] = pd.Series(list(map(lambda x: DggsCell(x), cell_ids_0)))
 
@@ -255,6 +276,12 @@ def cell_eaggr_t_downsampling(df, cell_id_col, metric_col, coarse_resolution, me
     return dfc
 
 
+def fix_3h_wkt(s):
+    p1 = s.replace("POLYGON ((", "").split(",")[0]
+    w = s.replace("))", ", " + p1 + "))")
+    return w
+
+
 def create_eaggr_geometry(df, dggs_type="ISEA4T"):
 
     dggs = Eaggr(Model.ISEA3H) if dggs_type == "ISEA3H" else Eaggr(Model.ISEA4T)
@@ -264,8 +291,11 @@ def create_eaggr_geometry(df, dggs_type="ISEA4T"):
     # df['geometry'] = df['geojson'].apply(
     #     lambda x: Polygon([x['coordinates'][0][0], x['coordinates'][0][1],
     #                        x['coordinates'][0][2]]))
-    df['geometry'] = df['cell'].apply(lambda x: Polygon(
-        json.loads(dggs.convert_dggs_cell_outline_to_shape_string(x, ShapeStringFormat.GEO_JSON))["coordinates"][0] ) )
+    if dggs_type == "ISEA3H":
+        df['geometry'] = df['cell'].apply(lambda x: dggs.convert_dggs_cell_outline_to_shape_string(x, ShapeStringFormat.WKT )).apply(fix_3h_wkt).apply(wkt.loads)
+    else:
+        df['geometry'] = df['cell'].apply(lambda x: Polygon(
+            json.loads(dggs.convert_dggs_cell_outline_to_shape_string(x, ShapeStringFormat.GEO_JSON))["coordinates"][0] ) )
     df = gpd.GeoDataFrame(df)
     df.crs = "EPSG:4326"
     return df[['cell_id', 'geometry']]
