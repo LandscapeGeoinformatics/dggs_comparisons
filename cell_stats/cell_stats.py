@@ -374,6 +374,7 @@ def create_cell_stats_df(params, cpus, results_path):
         name = f"{name}_{res}_{p_name}"
         parquet_file_name = os.path.join(results_path, f"{name}.parquet")
 
+        da6['wkt'] = da6['geometry'].apply(lambda x: x.wkt)
         da6_fin = da6.compute()
         da6_fin.drop(columns="geometry").to_parquet(parquet_file_name, compression='gzip', index=False)
 
