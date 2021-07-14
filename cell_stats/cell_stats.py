@@ -81,6 +81,8 @@ def get_conf(conf_path):
 
 def get_area_perimeter_from_lambert(geom):
     '''Area from cell's lambert azimutal projection'''
+    perimeter = np.nan
+    area = np.nan
     try:
         if (-180 <= geom.centroid.x <= 180) and (-90 <= geom.centroid.y <= 90):
             proj_str = f"+proj=laea +lat_0={geom.centroid.y} +lon_0={geom.centroid.x}"
@@ -89,12 +91,9 @@ def get_area_perimeter_from_lambert(geom):
             area = transform(project, geom).area
         else:
             print(f'invalid centroid {geom.centroid}')
-            perimeter = np.nan
-            area = np.nan
-    except:
-        print(f'invalid centroid None')
-        perimeter = np.nan
-        area = np.nan
+    except Exception as ex:
+        print(f'invalid centroid Exception')
+        print(ex)
     # return (area, perimeter)
     return pd.Series([area, perimeter])
 
@@ -148,16 +147,19 @@ def check_for_geom(geom):
     for p in range(1, len(geom.exterior.coords)):
         px = geom.exterior.coords[p]
         # print(px)
-
-        if check_crossing(p_init[0], px[0]):
+        try:
+            if check_crossing(p_init[0], px[0]):
+                crossed = True
+        except ValueError:
             crossed = True
+
         p_init = px
 
     return crossed
 
 
 @timer
-def get_cells_area_stats(df, res, npartitions=32):
+def get_cells_area_stats(df, res):
 
     # Filter out invalid geometry
     try:
@@ -186,9 +188,13 @@ def get_cells_area_stats(df, res, npartitions=32):
                                 'date_line_cross_error_cells':[date_line_cross_error_cells],'other_geom_anomalies':other_geom_anomalies})
 
         return stats_pd
-    except:
+    except Exception as ex:
+        print(ex)
         print(len(df))
-        return None
+        return stats_pd = pd.DataFrame({'resolution':[],'min_area':[],'max_area':[],\
+                                'std':[],'mean':[],'num_cells':[], 'std_area_std':[],\
+                                'std_area_range':[], 'zsc_std':[], 'zsc_std_range':[],\
+                                'date_line_cross_error_cells':[],'other_geom_anomalies':[]})
 
 
 def get_lambert_area(geom):
@@ -323,7 +329,7 @@ def create_cell_stats_df(params, cpus, results_path):
     stats = []
     d_name, res, p_name = params[0], params[1], params[2]
 
-    chunksize = 2000
+    chunksize = 1000
     npartitions = cpus * 2
 
     if len(params) == 4:
@@ -337,17 +343,16 @@ def create_cell_stats_df(params, cpus, results_path):
             print(f"starting create_cell_stats_df {chunksize} chunksize")
             da = ddf.from_pandas(gdf, chunksize=chunksize)
 
-        # gdf = get_cells_area(gdf, params[2])
-        da2 = da.map_partitions(lambda x: get_cells_area(x, params[2]), meta=pd.DataFrame({'cell_id':['str'], 'geometry': [ Point(1, 1) ], 'area': [1.0],'perimeter': [0.1]}))
-
         # area_stats = get_cells_area_stats(gdf,params[1])
-        da2['crossed'] = da2['geometry'].map_partitions( lambda x: x.apply(check_for_geom), meta=pd.Series([True]) )
+        da['crossed'] = da['geometry'].map_partitions( lambda x: x.apply(check_for_geom), meta=pd.Series([True]) )
 
-        da3 = da2.persist()
+        date_line_cross_error_cells = len(da[da['crossed']].compute().index)
 
-        date_line_cross_error_cells = len(da3[da3['crossed']].compute().index)
+        da2 = da[~da['crossed']]
+        # da2 = da.persist()
 
-        da3 = da3[~da3['crossed']]
+        # gdf = get_cells_area(gdf, params[2])
+        da3 = da2.map_partitions(lambda x: get_cells_area(x, params[2]), meta=pd.DataFrame({'cell_id':['str'], 'geometry': [ Point(1, 1) ], 'area': [1.0],'perimeter': [0.1]}))
 
         da4 = da3.persist()
 
@@ -375,7 +380,8 @@ def create_cell_stats_df(params, cpus, results_path):
         parquet_file_name = os.path.join(results_path, f"{name}.parquet")
 
         da6['wkt'] = da6['geometry'].apply(lambda x: x.wkt, meta=pd.Series({'wkt': ['str']}) )
-        da6_fin = da6.compute()
+        da6_fin = da6.dropna().compute()
+
         da6_fin.drop(columns="geometry").to_parquet(parquet_file_name, compression='gzip', index=False)
 
         area_mean = da6_fin['area'].mean()
