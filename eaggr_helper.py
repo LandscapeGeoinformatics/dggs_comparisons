@@ -289,7 +289,7 @@ def create_geom_defensively(cell_id):
 
     try:
         geom = wkt.loads(x2)
-    except IllegalArgumentException as ex:
+    except Exception as ex:
         print(ex)
         print(f"cell_id {cell_id}")
         print(f"wkt1 {x1}")
