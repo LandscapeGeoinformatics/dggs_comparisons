@@ -282,6 +282,22 @@ def fix_3h_wkt(s):
     return w
 
 
+def create_geom_defensively(cell_id):
+    geom = None
+    x1 = dggs.convert_dggs_cell_outline_to_shape_string(cell_id, ShapeStringFormat.WKT )
+    x2 = fix_3h_wkt(x1)
+
+    try:
+        geom = wkt.loads(x2)
+    except IllegalArgumentException as ex:
+        print(ex)
+        print(f"cell_id {cell_id}")
+        print(f"wkt1 {x1}")
+        print(f"wkt2 {x2}")
+
+    return geom
+
+
 def create_eaggr_geometry(df, dggs_type="ISEA4T"):
 
     dggs = Eaggr(Model.ISEA3H) if dggs_type == "ISEA3H" else Eaggr(Model.ISEA4T)
@@ -292,7 +308,8 @@ def create_eaggr_geometry(df, dggs_type="ISEA4T"):
     #     lambda x: Polygon([x['coordinates'][0][0], x['coordinates'][0][1],
     #                        x['coordinates'][0][2]]))
     if dggs_type == "ISEA3H":
-        df['geometry'] = df['cell'].apply(lambda x: dggs.convert_dggs_cell_outline_to_shape_string(x, ShapeStringFormat.WKT )).apply(fix_3h_wkt).apply(wkt.loads)
+        df['geometry'] = df['cell'].apply(create_geom_defensively)
+        df = df.dropna()
     else:
         df['geometry'] = df['cell'].apply(lambda x: Polygon(
             json.loads(dggs.convert_dggs_cell_outline_to_shape_string(x, ShapeStringFormat.GEO_JSON))["coordinates"][0] ) )
