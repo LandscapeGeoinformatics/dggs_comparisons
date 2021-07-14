@@ -10,6 +10,8 @@
         {"name":["DGGRID","ISEA4T"], "global_res":[4,5], "sample_res":[], "proj":"LAEA"},
         {"name":["DGGRID","FULLER4T"], "global_res":[4,5], "sample_res":[], "proj":"LAEA"},
         {"name":["DGGRID","ISEA4T"], "global_res":[4,5], "sample_res":[], "proj":"LAEA"},
-        {"name":["DGGRID","FULLER4T"], "global_res":[4,5], "sample_res":[], "proj":"LAEA"}
+        {"name":["DGGRID","FULLER4T"], "global_res":[4,5], "sample_res":[], "proj":"LAEA"},
+        {"name":["eaggr","ISEA4T"], "global_res":[4, 5], "sample_res":[], "proj":"LAEA"},
+        {"name":["eaggr","ISEA3H"], "global_res":[4, 5], "sample_res":[], "proj":"LAEA"}
     ]
 }

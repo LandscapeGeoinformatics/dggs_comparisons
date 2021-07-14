@@ -1,6 +1,5 @@
 {
     "dggss":[
-        {"name":["eaggr","ISEA4T"], "global_res":[3, 4], "sample_res":[], "proj":"LAEA"},
-        {"name":["eaggr","ISEA3H"], "global_res":[3, 4], "sample_res":[], "proj":"LAEA"}
+        {"name":["eaggr","ISEA3H"], "global_res":[5], "sample_res":[], "proj":"LAEA"}
     ]
 }
