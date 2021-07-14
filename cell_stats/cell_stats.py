@@ -2,7 +2,7 @@ import sys
 import os
 
 import geopandas as gpd
-from shapely.geometry import Polygon, shape
+from shapely.geometry import Polygon, shape, Point
 from shapely.ops import transform
 import pyproj
 import argparse
@@ -338,7 +338,7 @@ def create_cell_stats_df(params, cpus, results_path):
             da = ddf.from_pandas(gdf, chunksize=chunksize)
 
         # gdf = get_cells_area(gdf, params[2])
-        da2 = da.map_partitions(lambda x: get_cells_area(x, params[2]), meta=pd.DataFrame({'cell_id':['str'], 'geometry': ['str'], 'area': [1.0],'perimeter': [0.1]}))
+        da2 = da.map_partitions(lambda x: get_cells_area(x, params[2]), meta=pd.DataFrame({'cell_id':['str'], 'geometry': [ Point(1, 1) ], 'area': [1.0],'perimeter': [0.1]}))
 
         # area_stats = get_cells_area_stats(gdf,params[1])
         da2['crossed'] = da2['geometry'].map_partitions( lambda x: x.apply(check_for_geom), meta=pd.Series([True]) )
@@ -374,7 +374,7 @@ def create_cell_stats_df(params, cpus, results_path):
         name = f"{name}_{res}_{p_name}"
         parquet_file_name = os.path.join(results_path, f"{name}.parquet")
 
-        da6['wkt'] = da6['geometry'].apply(lambda x: x.wkt)
+        da6['wkt'] = da6['geometry'].apply(lambda x: x.wkt, meta=pd.Series({'wkt': ['str']}) )
         da6_fin = da6.compute()
         da6_fin.drop(columns="geometry").to_parquet(parquet_file_name, compression='gzip', index=False)
 
