@@ -158,6 +158,7 @@ def check_for_geom(geom):
     return crossed
 
 
+@timer
 def check_geom_dfp(gdf):
     gdf['crossed'] = gdf['geometry'].apply(check_for_geom)
     return gdf
