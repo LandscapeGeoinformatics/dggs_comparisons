@@ -1,5 +1,10 @@
 {
     "dggss":[
-        {"name":["eaggr","ISEA3H"], "global_res":[5], "sample_res":[], "proj":"LAEA"}
+        {"name":["h3"], "global_res":[3], "sample_res":[5], "proj":"LAEA"},
+        {"name":["s2"], "global_res":[3], "sample_res":[7], "proj":"LAEA"},
+        {"name":["rhpix"], "global_res":[3], "sample_res":[5], "proj":"LAEA"},
+        {"name":["DGGRID","ISEA7H"], "global_res":[3], "sample_res":[6], "proj":"LAEA"},
+        {"name":["eaggr","ISEA4T"], "global_res":[3], "sample_res":[4], "proj":"LAEA"},
+
     ]
 }

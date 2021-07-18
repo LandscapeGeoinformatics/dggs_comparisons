@@ -89,7 +89,10 @@ def get_eaggr_cells(res, extent=None, dggs_type="ISEA4T"):
     extent (list): Extent as array of 2 lon lat pairs to get raster values for
     Returns:
     Pandas dataframe
-   """
+    """
+    if extent:
+        print("currently not reliably implemented")
+        # potentially create grid (see above) and "convert to EAGGR cells", then fill rest?
     dggs = Eaggr(Model.ISEA3H) if dggs_type == "ISEA3H" else Eaggr(Model.ISEA4T)
 
     cell_ids_0 = []
