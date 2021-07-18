@@ -254,7 +254,8 @@ def gen_cells(config, cpus, results_path, dggrid_exec, dggrid_work_dir):
                 gdf = create_cells(params[0], params[1], params[3])
                 rows = len(gdf.index)
                 print(f"writing {parquet_file_name} with {rows} rows")
-                gdf['geometry'].apply(g: g.wkt if not g is None else 'error').drop(columns="geometry").to_parquet(parquet_file_name, compression='gzip', index=False)
+                gdf['wkt'] = gdf['geometry'].apply(lambda g: g.wkt if not g is None else 'error')
+                pd.DataFrame(gdf.drop(columns="geometry")).to_parquet(parquet_file_name, compression='gzip', index=False)
 
 
 def main():
@@ -399,3 +400,8 @@ def main():
 
     else:
         print("no -action specified, you should be sure which one to chose")
+
+
+if __name__ == "__main__":
+    main()
+
