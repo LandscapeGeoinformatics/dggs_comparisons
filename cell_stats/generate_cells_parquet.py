@@ -317,19 +317,19 @@ def main():
 
     #Specify number of paralell processes
     parser.add_argument('-cpu', action='store', dest='cpu', default='3',
-                        help='Number of processes to run')
+                        help='Number of cpus for parallel processes to run')
 
     #Specify output folder
     parser.add_argument('-out', action='store', dest='out', default=os.path.join(script_dir,'results'),
-                        help='Number of processes to run')
+                        help='Specify output folder')
 
     #Specify sample polygons path
     parser.add_argument('-sample', action='store', dest='sample', default=os.path.join(script_dir,'sample_polygons.geojson'),
-                        help='Number of processes to run')
+                        help='Specify sample polygons path')
 
-    #Specify sample polygons path
+    #Specify dggrid path
     parser.add_argument('-dggrid', action='store', dest='dggrid', default=os.path.join(script_dir,'dggrid'),
-                        help='Number of processes to run')
+                        help='Specify dggrid path')
 
     #Get the results of argument parsing
     results = parser.parse_args()
@@ -345,6 +345,7 @@ def main():
     todo_command = results.action
 
     sample_polygons = gpd.read_file(sample,driver='GeoJSON')
+
     config = get_conf(config_path)
 
     dggrid_work_dir = os.path.join(script_dir,'dggrid_workdir')
@@ -379,7 +380,7 @@ def main():
             print(err)
 
     if todo_command == "cells":
-        gen_cells(config, cpus, results_path, dggrid_exec, dggrid_work_dir)
+        gen_cells(config, cpus, results_path, dggrid_exec, dggrid_work_dir, sample_polygons)
 
     elif todo_command == "stats":
         # create the dask client
