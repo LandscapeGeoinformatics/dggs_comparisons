@@ -10,7 +10,7 @@ import functools
 import numpy as np
 import pandas as pd
 import geopandas as gpd
-from shapely.geometry import Polygon, shape, Point
+from shapely.geometry import Polygon, shape, Point, mapping
 from shapely.ops import transform
 import pyproj
 
@@ -177,12 +177,12 @@ def get_cells_area(gdf,crs):
 @timer
 def create_cells(dggs, resolution, dggrid, extent=None):
     '''Creates cells for given DGGS on given resolution'''
-    # clip_geom is a shapely geometry
+    # extent is a shapely geometry
 
     if dggs[0] == 'h3':
         # extent (list): Extent as array of 2 lon lat pairs
         if extent:
-            df = get_h3_cells(resolution,extent.bounds)
+            df = get_h3_cells(resolution, mapping(extent) )
         else:
             df = get_h3_cells(resolution,extent)
 
@@ -200,7 +200,7 @@ def create_cells(dggs, resolution, dggrid, extent=None):
     elif dggs[0] == 'DGGRID':
         # clip_geom is a shapely geometry
         if extent:
-            extent = shape(extent['geometry'])
+            extent = extent
             gdf = dggrid.grid_cell_polygons_for_extent(dggs[1], resolution, clip_geom=extent)
             gdf.crs = 'EPSG:4326'
         else:
@@ -211,7 +211,9 @@ def create_cells(dggs, resolution, dggrid, extent=None):
     elif dggs[0] == 'eaggr':
         # extent (list): Extent as array of 2 lon lat pairs
         if extent:
-            df = get_eaggr_cells(resolution,extent.bounds, dggs[1])
+            print("currently not implemented")
+            # df = get_eaggr_cells(resolution,extent.bounds, dggs[1])
+            df = pd.DataFrame({'cell_id': [], 'cell': [], 'geometry': []})
         else:
             df = get_eaggr_cells(resolution,extent, dggs[1])
 
@@ -257,11 +259,14 @@ def gen_cells(config, cpus, results_path, dggrid_exec, dggrid_work_dir, sample_p
             else:
                 gdf = create_cells(dggs=params[0], resolution=params[1], dggrid=params[3], extent=None)
                 rows = len(gdf.index)
-                print(f"writing {parquet_file_name} with {rows} rows")
-                gdf['wkt'] = gdf['geometry'].apply(lambda g: g.wkt if not g is None else 'error')
-                pd.DataFrame(gdf.drop(columns="geometry")).to_parquet(parquet_file_name, compression='gzip', index=False)
+                if rows > 0:
+                    print(f"writing {parquet_file_name} with {rows} rows")
+                    gdf['wkt'] = gdf['geometry'].apply(lambda g: g.wkt if not g is None else 'error')
+                    pd.DataFrame(gdf.drop(columns="geometry")).to_parquet(parquet_file_name, compression='gzip', index=False)
+                else:
+                    print(f"Skipping {parquet_file_name} with {rows} rows")
 
-        if sample_polygons:
+        if not sample_polygons is None:
 
             for res in dggs['sample_res']:
                 print(f"Start processing sample_res resolution {res}")
@@ -269,28 +274,28 @@ def gen_cells(config, cpus, results_path, dggrid_exec, dggrid_work_dir, sample_p
                 params = [dggs['name'], res, dggs['proj'], dggrid_instance]
                 d_name, res, p_name = params[0], params[1], params[2]
 
-                name = d_name[0]
-                if len(d_name) > 1:
-                    name = '_'.join(d_name)
+                for idx, row in sample_polygons.iterrows():
+                    name = d_name[0]
+                    if len(d_name) > 1:
+                        name = '_'.join(d_name)
+                
+                    name = f"{name}_{res}_{p_name}_sample_id_{idx}"
+                    parquet_file_name = os.path.join(results_path, f"{name}.parquet")
 
-                name = f"{name}_{res}_{p_name}"
-                parquet_file_name = os.path.join(results_path, f"{name}_sampled.parquet")
-
-                if os.path.exists(parquet_file_name):
-                    print(f"{parquet_file_name} file exists, skipping")
-                    continue
-                else:
-                    all_dfs = []
-                    for idx, row in sample_polygons.iterrows():
+                    if os.path.exists(parquet_file_name):
+                        print(f"{parquet_file_name} file exists, skipping")
+                        continue
+                    else:
                         extent = row['geometry']
-                        df = create_cells(params[0], params[1], params[3], extent)
-                        all_dfs.append(df)
-                    gdf = pd.concat(all_dfs)
+                        gdf = create_cells(params[0], params[1], params[3], extent)
 
-                    rows = len(gdf.index)
-                    print(f"writing {parquet_file_name} with {rows} rows")
-                    gdf['wkt'] = gdf['geometry'].apply(lambda g: g.wkt if not g is None else 'error')
-                    pd.DataFrame(gdf.drop(columns="geometry")).to_parquet(parquet_file_name, compression='gzip', index=False)
+                        rows = len(gdf.index)
+                        if rows > 0:
+                            print(f"writing {parquet_file_name} with {rows} rows")
+                            gdf['wkt'] = gdf['geometry'].apply(lambda g: g.wkt if not g is None else 'error')
+                            pd.DataFrame(gdf.drop(columns="geometry")).to_parquet(parquet_file_name, compression='gzip', index=False)
+                        else:
+                            print(f"Skipping {parquet_file_name} with {rows} rows")
         else:
             print("no sampling polygons provided. skipping.")
 
