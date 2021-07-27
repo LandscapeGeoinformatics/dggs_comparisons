@@ -172,7 +172,7 @@ def main():
     if not worklist == 'empty':
         if num < 0:
             try:
-                num = os.environ["SLURM_ARRAY_TASK_ID"]
+                num = int(os.environ["SLURM_ARRAY_TASK_ID"])
             except:
                 print("error, no task ID work item number possible")
 

@@ -4,3 +4,4 @@ results/
 results*/
 *.log
 .ipynb_checkpoints
+slurm*.out
