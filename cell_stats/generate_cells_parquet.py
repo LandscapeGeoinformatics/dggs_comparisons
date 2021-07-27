@@ -303,7 +303,7 @@ def gen_cells(config, cpus, results_path, dggrid_exec, dggrid_work_dir, sample_p
 @timer
 def create_cell_stats_df(params, parquet_file_name, results_path):
     '''Create cell stats.'''
-    d_name = params[0]
+    d_name, res = params[0], params[1]
 
     name = d_name[0]
     if len(d_name) > 1:
@@ -318,7 +318,7 @@ def create_cell_stats_df(params, parquet_file_name, results_path):
     geometry_errors = da['area'].isna().sum()
     da = da[~da['area'].isna()]
     date_line_cross_error_cells = len(da[da['crossed']].index)
-    da2 = da[~da['crossed']]
+    da = da[~da['crossed']]
 
     area_q_low = da['area'].quantile(0.005)
     area_q_high = da['area'].quantile(0.995)
