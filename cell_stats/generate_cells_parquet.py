@@ -278,7 +278,7 @@ def gen_cells(config, cpus, results_path, dggrid_exec, dggrid_work_dir, sample_p
                     name = d_name[0]
                     if len(d_name) > 1:
                         name = '_'.join(d_name)
-                
+
                     name = f"{name}_{res}_{p_name}_sample_id_{idx}"
                     parquet_file_name = os.path.join(results_path, f"{name}.parquet")
 
@@ -298,6 +298,102 @@ def gen_cells(config, cpus, results_path, dggrid_exec, dggrid_work_dir, sample_p
                             print(f"Skipping {parquet_file_name} with {rows} rows")
         else:
             print("no sampling polygons provided. skipping.")
+
+
+@timer
+def create_cell_stats_df(params, parquet_file_name, results_path):
+    '''Create cell stats.'''
+    d_name = params[0]
+
+    name = d_name[0]
+    if len(d_name) > 1:
+        name = '_'.join(d_name)
+
+    stats = []
+
+    da = pd.read_parquet(parquet_file_name)
+    num_cells_pre = len(da.index)
+    # cell_id 	crossed 	area 	perimeter 	c_orig 	zsc 	lon 	lat
+
+    geometry_errors = da['area'].isna().sum()
+    da = da[~da['area'].isna()]
+    date_line_cross_error_cells = len(da[da['crossed']].index)
+    da2 = da[~da['crossed']]
+
+    area_q_low = da['area'].quantile(0.005)
+    area_q_high = da['area'].quantile(0.995)
+
+    other_geom_anomalies = len( da[(da['area'] < area_q_low) & (da['area'] > area_q_high)] )
+
+    area_min = da['area'].min()
+    area_max = da['area'].max()
+    area_std = da['area'].std()
+    area_mean = da['area'].mean()
+
+    da['norm_area'] = da['area'] / area_mean
+    norm_area_std = da['norm_area'].std()
+    norm_area_range = da['norm_area'].max() - da['norm_area'].min()
+
+    zsc_min = da['zsc'].min()
+    zsc_max = da['zsc'].max()
+    zsc_std = da['zsc'].std()
+    zsc_mean = da['zsc'].mean()
+
+    da['norm_zsc'] = da['zsc'] / zsc_mean
+    norm_zsc_std = da['norm_zsc'].std()
+    norm_zsc_range = da['norm_zsc'].max() - da['norm_zsc'].min()
+
+    c_orig_std = da['c_orig'].std()
+    c_orig_std_range = da['c_orig'].max() - da['c_orig'].min()
+
+    c_orig_min = da['c_orig'].min()
+    c_orig_max = da['c_orig'].max()
+    c_orig_std = da['c_orig'].std()
+    c_orig_mean = da['c_orig'].mean()
+
+    da['norm_c_orig'] = da['c_orig'] / c_orig_mean
+    norm_c_orig_std = da['norm_c_orig'].std()
+    norm_c_orig_range = da['norm_c_orig'].max() - da['norm_c_orig'].min()
+
+    num_cells_used = len(da)
+
+    area_stats = pd.DataFrame(
+        {'name':[name],
+         'resolution':[res],
+         'min_area':[area_min],
+         'max_area':[area_max],
+         'std':[area_std],
+         'mean':[area_mean],
+         'norm_area_std':[norm_area_std],
+         'norm_area_range':[norm_area_range],
+
+         'min_zsc':[zsc_min],
+         'max_zsc':[zsc_max],
+         'zsc_std':[zsc_std],
+         'zsc_mean':[zsc_mean],
+         'norm_zsc_std':[norm_zsc_std],
+         'norm_zsc_range':[norm_zsc_range],
+
+         'min_c_orig':[c_orig_min],
+         'max_c_orig':[c_orig_max],
+         'c_orig_std':[c_orig_std],
+         'c_orig_mean':[c_orig_mean],
+         'norm_c_orig_std':[norm_c_orig_std],
+         'norm_c_orig_range':[norm_c_orig_range],
+
+         'num_cells_used':[num_cells_used],
+         'num_cells_pre':[num_cells_pre],
+         'date_line_cross_error_cells':[date_line_cross_error_cells],
+         'other_geom_anomalies':[other_geom_anomalies],
+         'geometry_errors':[geometry_errors]
+         }
+    )
+
+    print(f"area_q_low {area_q_low}, area_q_high {area_q_high}, other_geom_anomalies {other_geom_anomalies}, geometry_errors {geometry_errors}, date_line_cross_error_cells {date_line_cross_error_cells} (num_cells_pre {num_cells_pre})")
+
+    stats.append(area_stats)
+
+    return pd.concat(stats)
 
 
 def main():
@@ -388,36 +484,63 @@ def main():
         gen_cells(config, cpus, results_path, dggrid_exec, dggrid_work_dir, sample_polygons)
 
     elif todo_command == "stats":
-        # create the dask client
-        cluster = LocalCluster(processes=True, n_workers=cpus)
-        dclient = Client(cluster)
 
-
-
-        dclient.close()
-
-    elif todo_command == "cell_stats":
-        # create the dask client
-        cluster = LocalCluster(processes=True, n_workers=cpus)
-        dclient = Client(cluster)
+        counter = 0
+        found_files = []
 
         for dggs in config['dggss']:
-            print(f"Start processing {dggs['name']}")
-            if dggs['name'][0] == 'DGGRID':
-                dggrid_instance = DGGRIDv7(executable=dggrid_exec, working_dir=dggrid_work_dir, capture_logs=False, silent=False)
-            else:
-                dggrid_instance = None
+
             stats_df_global = []
             for res in dggs['global_res']:
-                print(f"Start processing global resolution {res}")
 
-                out_df = create_cell_stats_df([dggs['name'], res, dggs['proj'], dggrid_instance], cpus, results_path)
-                stats_df_global.append(out_df)
+                params = [dggs['name'], res, dggs['proj'], None]
+                d_name, res, p_name = params[0], params[1], params[2]
+
+                name = d_name[0]
+                if len(d_name) > 1:
+                    name = '_'.join(d_name)
+
+                name = f"{name}_{res}_{p_name}"
+                parquet_file_name = os.path.join(results_path, f"{name}.parquet")
+                parquet_file_name = f"{parquet_file_name.replace('.parquet', '_step2.parquet')}"
+
+
+                if os.path.exists(parquet_file_name):
+                    # print(f"{parquet_file_name} file exists, ok")
+                    counter = counter + 1
+                    found_files.append(parquet_file_name)
+
+                    out_df = create_cell_stats_df([dggs['name'], res, dggs['proj'], "global"], parquet_file_name, results_path)
+                    stats_df_global.append(out_df)
+
+                else:
+                    print(f"{parquet_file_name} file MISSING")
 
             stats_df_sample = []
             for res in dggs['sample_res']:
-                print(f"Start processing local resolution {res}")
-                stats_df_sample.append(cell_stats_parallel(create_cell_stats_df, sample_polygons,[dggs['name'], res, dggs['proj'], dggrid_instance], cpus))
+
+                params = [dggs['name'], res, dggs['proj'], None]
+                d_name, res, p_name = params[0], params[1], params[2]
+
+                for idx, row in sample_polygons.iterrows():
+                    name = d_name[0]
+                    if len(d_name) > 1:
+                        name = '_'.join(d_name)
+
+                    name = f"{name}_{res}_{p_name}_sample_id_{idx}"
+                    parquet_file_name = os.path.join(results_path, f"{name}.parquet")
+                    parquet_file_name = f"{parquet_file_name.replace('.parquet', '_step2.parquet')}"
+
+                    if os.path.exists(parquet_file_name):
+                        # print(f"{parquet_file_name} file exists, ok")
+                        counter = counter + 1
+                        found_files.append(parquet_file_name)
+
+                        out_df = create_cell_stats_df([dggs['name'], res, dggs['proj'], "sample"], parquet_file_name, results_path)
+                        stats_df_sample.append(out_df)
+
+                    else:
+                        print(f"{parquet_file_name} file MISSING")
 
             if len(stats_df_sample) > 0:
                 final_stats = pd.concat([pd.concat(stats_df_global),pd.concat(stats_df_sample)])
@@ -441,8 +564,6 @@ def main():
             res_file_name = os.path.join(results_path, default_name + f"_{name}.csv")
 
             final_stats.to_csv(res_file_name, index=False)
-
-        dclient.close()
 
     else:
         print("no -action specified, you should be sure which one to chose")

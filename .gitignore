@@ -3,3 +3,4 @@ dask-worker-space
 results/
 results*/
 *.log
+.ipynb_checkpoints
