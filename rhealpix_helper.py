@@ -3,7 +3,11 @@ import pandas as pd
 import geopandas as gpd
 from pyproj import Transformer
 from shapely.ops import transform
-import rasterio
+try:
+    import rasterio
+except ImportError:
+    print("rasterio not available")
+
 import time
 import sys
 import os
@@ -39,7 +43,9 @@ def __lonlat_to_latlon(lonlat_array):
 def __cell_to_geometry(cell):
     geom = None
     try:
-        geom =  Polygon(__lonlat_to_latlon(cell.boundary(n=2,plane=False)))
+        # geom =  Polygon(__lonlat_to_latlon(cell.boundary(n=2,plane=False)))
+        # gdf['geometry'] = gdf['cell_id'].apply(lambda x: Polygon(x.boundary(n=2,plane=False)))
+        geom = Polygon(cell.boundary(n=2,plane=False))
     except:
         print(f'internal rhealpix error with cell.boundary method for {str(cell)}')
     return geom
@@ -48,6 +54,7 @@ def create_rhpix_geometry(df):
 
     gdf = gpd.GeoDataFrame(df.copy())
     gdf['geometry'] = gdf['cell_id'].apply(__cell_to_geometry)
+
     gdf.crs = 'EPSG:4326'
     gdf['cell_id'] = gdf['cell_id'].apply(lambda x: str(x))
 
@@ -60,11 +67,11 @@ def get_rhpix_cells(res, extent=None):
         se = (extent[1], extent[2])
         nw = (extent[3], extent[0])
         set_hex = list(flatten(rdggs.cells_from_region(res, se, nw, plane=False)))
-    else:    
+    else:
         set_hex = [x for x in rdggs.grid(res)]
 
     df = pd.DataFrame({"cell_id": set_hex})
-    
+
     return df
 
 
@@ -83,21 +90,21 @@ def create_rhpix_geom_cells_global(resolutions, table, export_type, db_engine=''
     rdggs = WGS84_003
     transformer = Transformer.from_crs("epsg:4326", 'proj=rhealpix')
     for res in resolutions:
-        
+
         gdf = gpd.GeoDataFrame({'cell_id':[x for x in rdggs.grid(res)]})
         gdf['geometry'] = gdf['cell_id'].apply(lambda x: Polygon(x.boundary(n=10,plane=False)))
         gdf.crs = 'EPSG:4326'
         gdf['cell_id'] = gdf['cell_id'].apply(lambda x: str(x))
         gdf['area'] = gdf['geometry'].apply(lambda x: transform(transformer.transform, x).area)
-        
+
         print('finish caclulating geometry {} {}'.format(res, time.asctime(time.localtime(time.time()))))
-        
+
         if export_type == 'postgres':
-            
+
             gdf.to_postgis(table + str(res), db_engine, if_exists='replace')
             print('finish import to db {} {}'.format(res, time.asctime(time.localtime(time.time()))))
 
-            
+
         elif export_type == 'geojson':
 
             gdf.to_file("{}{}.geojson".format(table, res), driver='GeoJSON')
@@ -169,7 +176,7 @@ def raster_to_rhpix(raster_path, value_name, cell_min_res, cell_max_res, extent=
     # Get raster values for each cell_id
     print(f"Start getting raster values for cells at resolution {resolution}")
     df[value_name] = df['cell_id'].apply(lambda x: raster_band_array[rs.index(x.centroid(plane=False)[1], x.centroid(plane=False)[0])])
-    
+
     # Drop nodata
     df = df[df[value_name] != rs.nodata]
 

@@ -1,0 +1,58 @@
+# CMake CPP on Windows
+
+some Links:
+
+- https://arrow.apache.org/docs/developers/cpp/windows.html (https://github.com/apache/arrow/blob/master/ci/conda_env_cpp.txt)
+- https://www.scivision.dev/cmake-install-windows/
+- https://abseil.io/docs/cpp/quickstart-cmake
+
+Cmake, Visual Studio and Ninja:
+
+For newer versions of Visual Studio, specify the generator Visual Studio 16 2019 or see cmake --help for available generators.
+
+"C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\Tools\VsDevCmd.bat" -arch=amd64
+
+Newer versions of Visual Studio include Ninja. To see if your Visual Studio includes Ninja, run the initialization command shown above (vcvarsall.bat or VsDevCmd.bat), then run ninja --version.
+
+
+## Native building of Abseit-CPP
+
+- it workd on Linux
+- the install was made into a separate src directory only for S2 dev
+
+
+
+cmake -DCMAKE_CXX_STANDARD=17 -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=../../absl-install ..
+make
+make install
+
+- on windows?
+
+// consider adding? -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE -DBUILD_SHARED_LIBS=TRUE
+cmake -DCMAKE_CXX_STANDARD=17 -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=../../absl-install ..
+
+cmake --build . --config Release --target INSTALL
+
+
+## S2Geometry tests
+
+mkdir build
+cd build
+
+- it worked on Linux (with the specific abseil compile):
+
+// conda install -c conda-forge swig
+
+cmake -DCMAKE_CXX_FLAGS=-fPIC  -DCMAKE_PREFIX_PATH=/home/geoadmin/dev/dggs/s2geometry/absl-install/ -DBUILD_SHARED_LIBS=OFF -DWITH_PYTHON=ON ..
+
+
+- but didn't generate s2.dll or pywraps.py on Windows
+- tried both with shared libs on and off
+- used a conda build env with conda-forge cmake and abseil-cpp packages (could be the problem?)
+- tried with and without specifying -G "Visual Studio 16 2019" -A x64
+
+cmake -DCMAKE_INSTALL_PREFIX=/path/to/install -DWITH_PYTHON=ON -DBUILD_SHARED_LIBS=OFF ..
+
+// test: cmake -DCMAKE_INSTALL_PREFIX=%CONDA_PREFIX%\Library -DCMAKE_PREFIX_PATH=C:\dev\build\s2geometry\abseil-cpp\absl-install -DWITH_PYTHON=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE ..
+
+// cmake -DCMAKE_INSTALL_PREFIX=%CONDA_PREFIX%\Library -DCMAKE_PREFIX_PATH=C:\dev\build\s2geometry\abseil-cpp\absl-install -DWITH_PYTHON=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE -G "Ninja" -DCMAKE_C_COMPILER=clcache -DCMAKE_C_COMPILER=clcache ..

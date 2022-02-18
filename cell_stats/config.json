@@ -1,7 +1,7 @@
 {
     "dggss":[
         {"name":["h3"], "global_res":[2,3,4,5,6], "sample_res":[7,8], "proj":"LAEA"},
-        {"name":["s2"], "global_res":[2,4,5,6,7,8,9,10], "sample_res":[11,12], "proj":"LAEA"},
+        {"name":["s2"], "global_res":[2,3,4,5,6,7,8,9,10], "sample_res":[11,12], "proj":"LAEA"},
         {"name":["rhpix"], "global_res":[2,3,4,5,6], "sample_res":[7,8], "proj":"LAEA"},
         {"name":["DGGRID","ISEA7H"], "global_res":[2,3,4,5,6,7], "sample_res":[8,9], "proj":"LAEA"},
         {"name":["DGGRID","FULLER7H"], "global_res":[2,3,4,5,6,7], "sample_res":[8,9], "proj":"LAEA"},
