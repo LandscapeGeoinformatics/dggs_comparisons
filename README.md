@@ -1,5 +1,7 @@
 # code supplement for DGGS geometry comparisons
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5905936.svg)](https://doi.org/10.5281/zenodo.5905936)
+
 Assumptions are that the respective libraries are installed with their Python bindings:
 
  - [Google S2](https://s2geometry.io/) and https://github.com/google/s2geometry/tree/master/src/python
