@@ -1,6 +1,6 @@
 # code supplement for DGGS geometry comparisons
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5905936.svg)](https://doi.org/10.5281/zenodo.5905936)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5905935.svg)](https://doi.org/10.5281/zenodo.5905935)
 
 Assumptions are that the respective libraries are installed with their Python bindings:
 
