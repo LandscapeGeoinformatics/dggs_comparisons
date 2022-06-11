@@ -17,6 +17,8 @@ import pyproj
 import dask
 import dask.dataframe as ddf
 
+import time
+
 from dask.distributed import Client, LocalCluster
 # from sklearn.metrics import max_error, mean_absolute_error
 
@@ -25,7 +27,8 @@ from dask.distributed import Client, LocalCluster
 # OpenEAGGR via Python wheel egg
 
 # Google S2 via sys.path.append('/usr/local/lib/python3/dist-packages')
-sys.path.append('/usr/local/lib/python3.7/site-packages')
+# sys.path.append('/usr/local/lib/python3.7/site-packages')
+sys.path.append("/usr/lib/python3.10/site-packages")
 
 sys.path.append('..')
 

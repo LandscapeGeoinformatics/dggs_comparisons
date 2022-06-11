@@ -4,7 +4,13 @@ import geopandas as gpd
 from shapely.geometry import Polygon, Point, box
 from shapely.ops import transform
 from pyproj import Transformer
-import rasterio
+
+try:
+    import rasterio
+except ImportError as ex:
+    print("rasterio modules not found")
+    print(ex)
+
 from math import radians, sin, cos, asin, sqrt
 
 
@@ -26,7 +32,7 @@ def __haversine(lon1, lat1, lon2, lat2):
 
 
 def s2_geometry_from_cellid(cell_id):
-    new_cell = s2.S2Cell(s2.S2CellId.FromToken(cell_id,len(cell_id)))
+    new_cell = s2.S2Cell(s2.S2CellId.FromToken(cell_id))
     vertices = []
     for i in range(0, 4):
         vertex = new_cell.GetS2LatLngVertex(i)
@@ -46,7 +52,7 @@ def get_s2_cells(res, extent=None):
     """Get s2 cells for given resolution
 
     Parameters:
-    res (int): S2 resolution 
+    res (int): S2 resolution
     extent (list): Extent as array of 2 lon lat pairs to get raster values for
     Returns:
     Pandas dataframe
@@ -68,7 +74,7 @@ def get_s2_cells(res, extent=None):
         set_hex = [x.ToToken() for x in coverer.GetCovering(region_rect)]
 
     df = pd.DataFrame({"cell_id": set_hex})
-    
+
     return df
 
 

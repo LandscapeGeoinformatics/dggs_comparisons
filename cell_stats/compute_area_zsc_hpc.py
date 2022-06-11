@@ -41,7 +41,7 @@ def get_area_perimeter_from_lambert(geom):
     return pd.Series([area, perimeter])
 
 
-def zsc_calculation_np(df, spherical=False):
+def compactness_calculation_np(df, spherical=False):
     np_area = df['area'].values
     np_peri = df['perimeter'].values
 
