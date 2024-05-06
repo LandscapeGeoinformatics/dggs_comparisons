@@ -28,7 +28,7 @@ from dask.distributed import Client, LocalCluster
 
 # Google S2 via sys.path.append('/usr/local/lib/python3/dist-packages')
 # sys.path.append('/usr/local/lib/python3.7/site-packages')
-sys.path.append("/usr/lib/python3.10/site-packages")
+# sys.path.append("/usr/lib/python3.10/site-packages")
 
 sys.path.append('..')
 
@@ -62,6 +62,12 @@ except ImportError as ex:
     print("dggrid4py modules not found")
     print(ex)
 
+try:
+    import healpy as hp
+    from healpy_helper import *
+except ImportError as ex:
+    print("healpy modules not found")
+    print(ex)
 
 
 def timer(func):
@@ -230,6 +236,17 @@ def create_cells(dggs, resolution, dggrid, extent=None):
             df = get_rhpix_cells(resolution,extent)
 
         gdf = create_rhpix_geometry(df)
+
+    elif dggs[0] == 'healpy':
+        # extent (list): Extent as array of 2 lon lat pairs
+        as_geojson = False
+        if extent:
+            df = get_healpy_cells(resolution,extent.bounds)
+            # as_geojson = True
+        else:
+            df = get_healpy_cells(resolution)
+
+        gdf = create_healpy_geometry(df, resolution, as_geojson=as_geojson)
 
     return gdf
 

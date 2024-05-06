@@ -68,6 +68,32 @@ def compactness_calculation_np(df, spherical=False):
         return zsc_np
 
 
+def zsc_calculation_np(df, spherical=False):
+    np_area = df['area'].values
+    np_peri = df['perimeter'].values
+
+    if not spherical:
+        top = 4*np.pi*np_area
+        bottom = np.square(np_peri)
+        c_orig = top / bottom
+
+        return c_orig
+    else:
+        t1 = 4*np.pi*np_area
+        t2 = np.square(np_area)
+        t3 = np.square(6378137.0)
+        top = np.sqrt( t1 - t2/t3 )
+        bottom = np_peri
+        zsc_np = top / bottom
+
+        # zsc_orig = df.apply(lambda row: math.sqrt(  4*math.pi*row['area'] - math.pow(row['area'],2) / math.pow(6378137,2)  )  /   row['perimeter'], axis=1).values
+        # diffs = np.sum(zsc_np - zsc_orig)
+        # ma = max_error(zsc_orig, zsc_np)
+        # mae = mean_absolute_error(zsc_orig, zsc_np)
+        # print(f"ma={ma} mae={mae} diffs={diffs}")
+
+        return zsc_np
+
 def check_crossing(lon1: float, lon2: float, validate: bool = True):
     """
     Assuming a minimum travel distance between two provided longitude coordinates,
