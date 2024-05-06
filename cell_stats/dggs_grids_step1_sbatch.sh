@@ -4,10 +4,10 @@
 #SBATCH -p main
 
 #The name of the job is test_job
-#SBATCH -J compute_area_zsc_hpc
+#SBATCH -J generate_cells_healpy
 
 ## number of tasks to run, ie number of instances of your command executed in parallel
-#SBATCH --ntasks=100
+#SBATCH --ntasks=1
 
 # CPUs per task
 #SBATCH --cpus-per-task=1
@@ -16,7 +16,7 @@
 #SBATCH --mem-per-cpu=16GB
 
 #The maximum walltime of the job is x minutes/hours
-#SBATCH -t 48:00:00
+#SBATCH -t 12:00:00
 
 #Notify user by email when certain events BEGIN,  END,  FAIL, REQUEUE, and ALL
 #SBATCH --mail-type=ALL
@@ -40,12 +40,13 @@ GDAL_DATA=/gpfs/space/home/kmoch/.conda/envs/geo2024/share/gdal
 PROJ_DATA=/gpfs/space/home/kmoch/.conda/envs/geo2024/share/proj
 PROJ_NETWORK=ON
 
-WORKDIR=/gpfs/space/home/kmoch/dggs-dev/dggs_comparisons/cell_stats/results_healpy
+WORKDIR=/gpfs/space/home/kmoch/dggs-dev/dggs_comparisons/cell_stats
 cd $WORKDIR
 
-$HOME/.conda/envs/geo2024/bin/python compute_area_zsc_hpc.py -worklist worklist.csv -workdir $WORKDIR
+$HOME/.conda/envs/geo2024/bin/python generate_cells_parquet.py -action cells -config config-healpy.json -cpu 1 -dggrid "none" -out results_healpy
 
-# run with sbatch --array=0-1553 dggs_grids_step2_sbatch.sh
+
+# run with sbatch --array=0-1553 dggs_grids_step1_sbatch.sh
 
 # 8 task per node,
 # 1 cpu per task
