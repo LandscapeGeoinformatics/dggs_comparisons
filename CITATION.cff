@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Kmoch"
+  given-names: "Alexander"
+  orcid: https://orcid.org/0000-0003-4386-4450
+- family-names: "Uuemaa"
+  given-names: "Evelyn"
+  orcid: https://orcid.org/0000-0002-0782-6740
+title: "Landscape Geoinformatics DGGS comparison materials (v4)"
+version: 1.0.0
+doi: 10.5281/zenodo.5905935
+date-released: 2024-05-07
+url: "https://github.com/LandscapeGeoinformatics/dggs_comparisons/"
