@@ -21,7 +21,7 @@ for a, b, c in os.walk(pqsrc):
 
 file_df = pd.DataFrame(healpy_files)
 file_df = file_df.rename(columns={0: 'infile'})
-file_df['outfile'] = file_df['infile'].apply(lambda s: s.replace('.parquet', '_step2.fgb'))
+file_df['outfile'] = file_df['infile'].apply(lambda s: s.replace('.parquet', '_step2.parquet'))
 
 outcsv = os.path.join(pqsrc, "worklist.csv")
 

@@ -1,5 +1,5 @@
 {
     "dggss":[
-        {"name":["healpy"], "global_res":[2,3,4,5,6,7], "sample_res":[], "proj":"LAEA"}
+        {"name":["healpy"], "global_res":[2,3,4,5,6,7,8], "sample_res":[], "proj":"LAEA"}
     ]
 }
