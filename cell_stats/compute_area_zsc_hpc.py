@@ -48,9 +48,10 @@ def compactness_calculation_np(df, spherical=False):
     if not spherical:
         top = 4*np.pi*np_area
         bottom = np.square(np_peri)
-        c_orig = top / bottom
+        ipq = top / bottom
+        
+        return ipq
 
-        return c_orig
     else:
         t1 = 4*np.pi*np_area
         t2 = np.square(np_area)
@@ -141,7 +142,7 @@ def the_job(parquet_file_name, parquet_file_name_step2):
         result = result.rename(columns={0: 'area', 1: 'perimeter'})
         df = df.assign(area=result['area'], perimeter=result['perimeter'] )
 
-        df['c_orig'] = zsc_calculation_np(df, False)
+        df['ipq'] = compactness_calculation_np(df, False)
         df['zsc'] = zsc_calculation_np(df, True)
 
         df = df[~df['area'].isna()]
@@ -149,6 +150,9 @@ def the_job(parquet_file_name, parquet_file_name_step2):
         result = df['geometry'].apply(lambda g: pd.Series((g.centroid.x, g.centroid.y)))
         result = result.rename(columns={0: 'lon', 1: 'lat'})
         df = df.assign(lon=result['lon'], lat=result['lat'] )
+ 
+        gdf = gpd.GeoDataFrame(df.drop(columns=['wkt']), geometry="geometry", crs=4326)
+        gdf.to_file(parquet_file_name_step2.replace('.parquet', '.fgb'), driver="FlatGeobuf")
 
         df = df.drop(columns=["geometry", 'wkt'])
 
