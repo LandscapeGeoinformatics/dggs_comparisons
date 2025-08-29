@@ -8,3 +8,4 @@ slurm*.out
 cell_stats/rhpix_emerg
 notebooks/.ipynb_checkpoints
 
+.DS_Store
